@@ -834,6 +834,24 @@ do
   vim.pack.add { gh 'rafamadriz/friendly-snippets' }
   require('luasnip.loaders.from_vscode').lazy_load()
 
+  -- Leave snippets on <Esc>. LuaSnip keeps a snippet live until the cursor
+  -- leaves its region, so after <Esc> the env name is still the active node and
+  -- text typed on e.g. `begin`'s body line lands in its (generated) transform
+  -- node, which gets restored -- deleting that text -- on the next InsertLeave.
+  -- ModeChanged fires before LuaSnip's own InsertLeave update, so run that
+  -- update here first, or mirrors like \end{...} would be left stale.
+  vim.api.nvim_create_autocmd('ModeChanged', {
+    pattern = { 'i:n', 's:n' },
+    callback = function(args)
+      local ls = require 'luasnip'
+      if ls.session.jump_active then return end
+      ls.active_update_dependents()
+      while ls.session.current_nodes[args.buf] do
+        ls.unlink_current()
+      end
+    end,
+  })
+
   -- [[ Autocomplete Engine ]]
   vim.pack.add { { src = gh 'saghen/blink.cmp', version = vim.version.range '1.*' } }
   require('blink.cmp').setup {
